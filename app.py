@@ -2,7 +2,9 @@ import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import StandardScaler, OneHotEncoder
+from sklearn.compose import ColumnTransformer
+from sklearn.pipeline import Pipeline
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score, confusion_matrix, classification_report
@@ -86,24 +88,27 @@ def prediction_page(df):
     # Prepare dataset for prediction
     categorical_val = [col for col in df.columns if len(df[col].unique()) <= 10]
     categorical_val.remove('target')
-    dataset = pd.get_dummies(df, columns=categorical_val)
-    scaler = StandardScaler()
-    cols_to_scale = ['age', 'trestbps', 'chol', 'thalach', 'oldpeak']
-    dataset[cols_to_scale] = scaler.fit_transform(dataset[cols_to_scale])
+    X = df.drop('target', axis=1)
+    y = df['target']
+    
+    # One-hot encode categorical features and scale numerical features
+    preprocessor = ColumnTransformer(
+        transformers=[
+            ('num', StandardScaler(), ['age', 'trestbps', 'chol', 'thalach', 'oldpeak']),
+            ('cat', OneHotEncoder(), categorical_val)
+        ])
+    
+    # Create the pipeline
+    pipeline = Pipeline(steps=[
+        ('preprocessor', preprocessor),
+        ('classifier', LogisticRegression(solver='liblinear'))
+    ])
 
     # Train-test split
-    X = dataset.drop('target', axis=1)
-    y = dataset['target']
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
+    pipeline.fit(X_train, y_train)
 
-    # Logistic Regression model
-    st.write("### Logistic Regression Model")
-
-    # Train the model
-    lr_clf = LogisticRegression(solver='liblinear')
-    lr_clf.fit(X_train, y_train)
-
-    # Function to display scores
+    # Display the results
     def print_score(clf, X_train, y_train, X_test, y_test, train=True):
         if train:
             pred = clf.predict(X_train)
@@ -122,12 +127,12 @@ def prediction_page(df):
             st.write(f"Classification Report:\n", clf_report)
 
     # Display the results
-    print_score(lr_clf, X_train, y_train, X_test, y_test, train=True)
-    print_score(lr_clf, X_train, y_train, X_test, y_test, train=False)
+    print_score(pipeline, X_train, y_train, X_test, y_test, train=True)
+    print_score(pipeline, X_train, y_train, X_test, y_test, train=False)
 
     # Summary results dataframe
-    train_score = accuracy_score(y_train, lr_clf.predict(X_train)) * 100
-    test_score = accuracy_score(y_test, lr_clf.predict(X_test)) * 100
+    train_score = accuracy_score(y_train, pipeline.predict(X_train)) * 100
+    test_score = accuracy_score(y_test, pipeline.predict(X_test)) * 100
     results_df = pd.DataFrame([["Logistic Regression", train_score, test_score]],
                               columns=['Model', 'Training Accuracy %', 'Testing Accuracy %'])
 
@@ -152,11 +157,12 @@ def prediction_page(df):
         'oldpeak': [oldpeak]
     })
 
-    # Apply scaling to the input data
-    input_data_scaled = scaler.transform(input_data)
+    # Include the categorical features for alignment
+    for col in categorical_val:
+        input_data[col] = 0
 
     # Make prediction
-    prediction = lr_clf.predict(input_data_scaled)
+    prediction = pipeline.predict(input_data)
 
     st.write("### Prediction Result")
     if prediction[0] == 1:
@@ -179,4 +185,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
