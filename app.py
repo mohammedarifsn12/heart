@@ -81,8 +81,8 @@ def eda_page(df):
     st.pyplot(fig)
 
 def prediction_page(df):
-    st.title("Prediction")
-    
+    st.title("Heart Disease Prediction")
+
     # Prepare dataset for prediction
     categorical_val = [col for col in df.columns if len(df[col].unique()) <= 10]
     categorical_val.remove('target')
@@ -133,6 +133,36 @@ def prediction_page(df):
 
     st.write("### Model Performance Summary")
     st.dataframe(results_df)
+
+    # User input for prediction
+    st.write("### Predict Heart Disease")
+
+    age = st.number_input("Age", min_value=0, value=50)
+    trestbps = st.number_input("Resting Blood Pressure (mm Hg)", min_value=0, value=120)
+    chol = st.number_input("Cholesterol (mg/dl)", min_value=0, value=200)
+    thalach = st.number_input("Maximum Heart Rate Achieved", min_value=0, value=150)
+    oldpeak = st.number_input("Depression Induced by Exercise (Oldpeak)", min_value=0.0, value=1.0)
+
+    # Prepare the input data for prediction
+    input_data = pd.DataFrame({
+        'age': [age],
+        'trestbps': [trestbps],
+        'chol': [chol],
+        'thalach': [thalach],
+        'oldpeak': [oldpeak]
+    })
+
+    # Apply scaling to the input data
+    input_data_scaled = scaler.transform(input_data)
+
+    # Make prediction
+    prediction = lr_clf.predict(input_data_scaled)
+
+    st.write("### Prediction Result")
+    if prediction[0] == 1:
+        st.write("The person is predicted to have heart disease.")
+    else:
+        st.write("The person is predicted not to have heart disease.")
 
 def main():
     st.sidebar.title("Navigation")
